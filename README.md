@@ -1,3 +1,13 @@
+---
+title: Agentic Honey Pot
+emoji: 🍯
+colorFrom: yellow
+colorTo: orange
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Agentic Honey-Pot System 🍯🤖
 
 **Autonomous scam detection and intelligence extraction using local LLM**
@@ -239,45 +249,25 @@ Tests include:
 - ✅ Intelligence extraction
 - ✅ Metrics endpoint
 
-## 🚢 Deployment (Render.com Free Tier)
+## 🚢 Deployment (Hugging Face Spaces - Free Tier)
 
-### 1. Prepare Repository
+Hugging Face Spaces is the recommended deployment platform for this project, as it provides **16GB RAM and 2 vCPUs** on its free Docker tier, making it ideal for running local LLMs like Llama 3.2.
 
+### 1. Create a Space
+1. Log in to [huggingface.co](https://huggingface.co) and click **"New Space"**.
+2. Select **Docker** as the SDK and choose the **Blank** template.
+3. In **Settings -> Variables and secrets**, add a secret named `API_KEY` with your chosen production key.
+
+### 2. Prepare and Push Code
+Add Hugging Face as a remote and push your main branch:
 ```bash
-git init
+git remote add hf https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE_NAME
 git add .
-git commit -m "Initial commit"
-git remote add origin <your-github-repo>
-git push -u origin main
+git commit -m "Deploying to Hugging Face Spaces"
+git push hf main --force
 ```
 
-### 2. Create Render Web Service
-
-1. Go to [render.com](https://render.com)
-2. New → Web Service
-3. Connect your GitHub repo
-4. Configure:
-   - **Name**: `agentic-honeypot`
-   - **Environment**: Python 3
-   - **Build Command**: `pip install -r requirements.txt && ollama pull qwen2.5:7b-instruct-q5_K_M`
-   - **Start Command**: `ollama serve & sleep 5 && python app.py`
-   - **Instance Type**: Free
-
-### 3. Set Environment Variables
-
-In Render dashboard, add:
-- `API_KEY`: `your-production-api-key-2026`
-- `PORT`: (auto-set by Render)
-- `OLLAMA_MODEL`: `qwen2.5:7b-instruct-q5_K_M`
-
-### 4. Deploy
-
-Render will auto-deploy. Your API will be at:
-```
-https://agentic-honeypot.onrender.com
-```
-
-**Note**: Free tier has cold starts (~30s) and limited CPU. For hackathon demo, keep the service warm by pinging `/health` every 5 minutes.
+**Note**: The app is configured to run on port **7860** (mandatory for HF Spaces). The startup script will automatically pull the optimized **Llama 3.2 1B** model.
 
 ## 📊 Evaluation Metrics
 
