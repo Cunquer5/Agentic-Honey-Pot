@@ -1,0 +1,228 @@
+{
+  "info": {
+    "name": "Agentic Honey-Pot API",
+    "description": "Collection for testing the Agentic Honey-Pot scam detection and engagement API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "a1d12dca689e4d14ab88e4de4d970e16.9cfsz7WpcD5isFOOAQO6ba3o",
+      "type": "string"
+    },
+    {
+      "key": "session_id",
+      "value": "test_{{$timestamp}}",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Webhook - Scam Message",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"message\": \"Hello sir, this is State Bank of India. Your ATM card is blocked due to suspicious activity. Please share your card number and CVV to unblock immediately.\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/webhook",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "webhook"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Webhook - UPI Scam",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"message\": \"Sir, send Rs 500 to scammer@paytm to claim your prize of Rs 50,000\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/webhook",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "webhook"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Webhook - Phishing Link",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"message\": \"Dear customer, your KYC is expired. Update immediately at https://fake-icici-verify.com or account will be suspended\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/webhook",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "webhook"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Webhook - Non-Scam Message",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"message\": \"Hi, are we still meeting for coffee tomorrow at 3 PM?\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/webhook",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "webhook"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Session Metrics",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/metrics/{{session_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "metrics",
+            "{{session_id}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Delete Session",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/sessions/{{session_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "sessions",
+            "{{session_id}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Root - API Info",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            ""
+          ]
+        }
+      }
+    }
+  ]
+}
