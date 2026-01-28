@@ -8,21 +8,28 @@ RUN apt-get update && apt-get install -y \
 # Install Ollama
 RUN curl -fsSL https://ollama.com/install.sh | sh
 
+# Create a non-root user (Hugging Face uses UID 1000)
+RUN useradd -m -u 1000 user
+USER user
+ENV PATH="/home/user/.local/bin:${PATH}"
+ENV OLLAMA_HOST=127.0.0.1
+ENV OLLAMA_HOME=/home/user/.ollama
+
 # Set working directory
 WORKDIR /app
 
 # Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --chown=user:user requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Copy application code
-COPY . .
+COPY --chown=user:user . .
 
-# Expose port
-EXPOSE 8000
+# Expose Hugging Face default port
+EXPOSE 7860
 
-# Pull LLM model during build (optional - can be slow)
-# RUN ollama serve & sleep 5 && ollama pull qwen2.5:7b-instruct-q5_K_M
+# Ensure start.sh is executable
+RUN chmod +x start.sh
 
 # Start script
 CMD ["bash", "start.sh"]

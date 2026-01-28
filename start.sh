@@ -23,5 +23,5 @@ else
 fi
 
 # Start FastAPI application
-echo "🌐 Starting FastAPI server on port ${PORT:-8000}..."
+echo "🌐 Starting FastAPI server on port ${PORT:-7860}..."
 python app.py
