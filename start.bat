@@ -34,10 +34,10 @@ echo.
 
 REM Check if model is downloaded
 echo Checking for LLM model...
-ollama list | findstr "qwen2.5:7b-instruct-q5_K_M" >nul 2>&1
+ollama list | findstr "llama3.2:1b-instruct-q4_K_M" >nul 2>&1
 if errorlevel 1 (
     echo [INFO] Model not found. Downloading (this may take a few minutes)...
-    ollama pull qwen2.5:7b-instruct-q5_K_M
+    ollama pull llama3.2:1b-instruct-q4_K_M
     if errorlevel 1 (
         echo [ERROR] Failed to download model
         echo Try smaller model: ollama pull llama3.2:3b-instruct-q4_K_M

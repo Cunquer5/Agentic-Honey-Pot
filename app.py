@@ -36,7 +36,7 @@ app = FastAPI(
 
 # Configuration from environment
 API_KEY = os.getenv("API_KEY", "your-secret-key-2026")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct-q5_K_M")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:1b-instruct-q4_K_M")
 MAX_TURNS = int(os.getenv("MAX_TURNS", "15"))
 MAX_HISTORY_TURNS = int(os.getenv("MAX_HISTORY_TURNS", "12"))
 

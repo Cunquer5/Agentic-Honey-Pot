@@ -15,7 +15,7 @@ if command -v ollama &> /dev/null; then
     
     # Pull the model
     echo "📥 Pulling LLM model (this may take a few minutes)..."
-    ollama pull ${OLLAMA_MODEL:-qwen2.5:7b-instruct-q5_K_M}
+    ollama pull ${OLLAMA_MODEL:-llama3.2:1b-instruct-q4_K_M}
     
     echo "✅ Model ready"
 else
