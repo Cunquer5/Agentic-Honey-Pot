@@ -388,10 +388,10 @@ DEBUG=false               # Set true to show detailed errors
 ## 📚 Tech Stack
 
 - **Framework**: FastAPI 0.109
-- **LLM**: Ollama (Qwen2.5-7B)
+- **LLM**: Ollama (Llama 3.2 1B)
 - **Extraction**: Regex + LLM parsing
 - **Storage**: In-memory (defaultdict)
-- **Deployment**: Render.com free tier
+- **Deployment**: Hugging Face Spaces (Docker)
 - **Testing**: Python requests
 
 ## 🤝 Contributing
