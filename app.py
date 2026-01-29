@@ -301,7 +301,6 @@ async def handle_scam_webhook(
     background_tasks: BackgroundTasks,
     x_api_key: Optional[str] = Header(None)
 ):
-    print("DEBUG: Webhook called!")
     """
     Main webhook endpoint for scam conversation handling.
     Receives scammer message, returns agent reply.
