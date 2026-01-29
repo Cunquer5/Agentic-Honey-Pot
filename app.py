@@ -8,6 +8,8 @@ from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import ollama
+from ollama import AsyncClient
+import asyncio
 import re
 import uuid
 import os
@@ -117,14 +119,15 @@ def extract_info_regex(text: str) -> ExtractedInfo:
     return ExtractedInfo(banks=banks, upis=upis, phishing_links=links)
 
 
-def llm_generate(prompt: str, max_tokens: int = 300) -> str:
+async def llm_generate(prompt: str, max_tokens: int = 300) -> str:
     """
-    Call local Ollama LLM with error handling.
+    Call local Ollama LLM asynchronously with error handling.
     Returns generated text or error message.
     """
     try:
         logger.info(f"LLM call with {len(prompt)} chars prompt, max_tokens={max_tokens}")
-        response = ollama.generate(
+        client = AsyncClient()
+        response = await client.generate(
             model=OLLAMA_MODEL,
             prompt=prompt,
             options={
@@ -143,36 +146,25 @@ def llm_generate(prompt: str, max_tokens: int = 300) -> str:
         return f"[LLM Error: {str(e)}]"
 
 
-def detect_scam(message: str) -> bool:
+async def detect_scam(message: str) -> bool:
     """
     Binary scam detection on initial message using LLM.
     Returns True if message is likely a scam.
     """
-    prompt = f"""You are a scam detection expert. Analyze if this message is almost certainly a scam.
-
-Common scam indicators:
-- Urgent requests for money, OTP, card details, bank info
-- Impersonation of bank, government, police, courier
-- Lottery/prize/investment offers requiring payment
-- Romance/relationship scams asking for money
-- Fake job offers requiring upfront fees
-- Threats or pressure tactics
-
-Message to analyze:
+    prompt = f"""Analyze if this message is a scam:
 "{message}"
 
-Answer with ONLY "YES" if this is a scam, or "NO" if legitimate. Then briefly explain in one line.
-
+Answer ONLY "YES" or "NO".
 Answer:"""
 
-    response = llm_generate(prompt, max_tokens=2)
+    response = await llm_generate(prompt, max_tokens=2)
     is_scam = response.lower().strip().startswith("yes")
     
     logger.info(f"Scam detection: {is_scam} | Response: {response[:100]}")
     return is_scam
 
 
-def generate_agent_reply(history: List[Dict[str, str]], session_data: Dict) -> str:
+async def generate_agent_reply(history: List[Dict[str, str]], session_data: Dict) -> str:
     """
     Generate agent's next conversational response using LLM.
     Maintains persona and tries to extract information naturally.
@@ -217,7 +209,7 @@ Reply ONLY with the message you would say. No explanation or meta-commentary.
 
 Your reply:"""
 
-    reply = llm_generate(prompt, max_tokens=40)
+    reply = await llm_generate(prompt, max_tokens=40)
     
     # Clean up any meta-commentary that might slip through
     reply = re.sub(r'\[.*?\]', '', reply)  # Remove [explanations]
@@ -283,28 +275,7 @@ async def handle_scam_webhook(
     
     logger.info(f"Session {sid[:8]}... | Turn {session['turn_count']} | Message: {request.message[:50]}...")
     
-    # First message: detect if scam
-    if session["turn_count"] == 0:
-        is_scam = detect_scam(request.message)
-        session["is_scam"] = is_scam
-        
-        if not is_scam:
-            logger.info(f"Session {sid[:8]}... | Not a scam, ending immediately")
-            return WebhookResponse(
-                reply="",
-                extracted=ExtractedInfo(),
-                done=True
-            )
-    
-    # Append scammer message to history
-    session["history"].append({
-        "role": "scammer",
-        "content": request.message,
-        "timestamp": datetime.now().isoformat()
-    })
-    session["turn_count"] += 1
-    
-    # Extract intelligence from scammer's message
+    # 1. Extract intelligence FIRST (Regex is near-instant)
     extracted_new = extract_info_regex(request.message)
     
     # Update cumulative extraction
@@ -312,8 +283,41 @@ async def handle_scam_webhook(
     session["extracted_cumulative"]["upis"].update(extracted_new.upis)
     session["extracted_cumulative"]["phishing_links"].update(extracted_new.phishing_links)
     
-    # Generate agent reply
-    agent_reply = generate_agent_reply(session["history"], session)
+    # 2. Parallel Processing: Detection & Reply
+    if session["turn_count"] == 0:
+        # Fast-Path: If regex finds clear indicators, bypass detection LLM
+        has_clear_intel = len(extracted_new.phishing_links) > 0 or len(extracted_new.upis) > 0
+        
+        # Pre-append for reply generation context
+        session["history"].append({
+            "role": "scammer",
+            "content": request.message,
+            "timestamp": datetime.now().isoformat()
+        })
+        session["turn_count"] += 1
+
+        if has_clear_intel:
+            is_scam = True
+            agent_reply = await generate_agent_reply(session["history"], session)
+        else:
+            # Run Detection and Reply in PARALLEL to save time
+            detect_task = asyncio.create_task(detect_scam(request.message))
+            reply_task = asyncio.create_task(generate_agent_reply(session["history"], session))
+            is_scam, agent_reply = await asyncio.gather(detect_task, reply_task)
+        
+        session["is_scam"] = is_scam
+        if not is_scam:
+            logger.info(f"Session {sid[:8]}... | Not a scam, ending immediately")
+            return WebhookResponse(reply="", extracted=ExtractedInfo(), done=True)
+    else:
+        # Subsequent turns
+        session["history"].append({
+            "role": "scammer",
+            "content": request.message,
+            "timestamp": datetime.now().isoformat()
+        })
+        session["turn_count"] += 1
+        agent_reply = await generate_agent_reply(session["history"], session)
     
     # Append agent reply to history
     session["history"].append({
