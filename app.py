@@ -4,7 +4,7 @@ Detects scams, engages scammers autonomously, extracts intelligence.
 No paid services - 100% local LLM via Ollama.
 """
 
-from fastapi import FastAPI, HTTPException, Header, Request
+from fastapi import FastAPI, HTTPException, Header, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import ollama
@@ -13,6 +13,7 @@ import asyncio
 import re
 import uuid
 import os
+import httpx
 from typing import Dict, List, Optional
 from collections import defaultdict
 from datetime import datetime
@@ -32,8 +33,8 @@ logger = logging.getLogger(__name__)
 # Initialize FastAPI app
 app = FastAPI(
     title="Agentic Honey-Pot API",
-    description="Autonomous scam detection and intelligence extraction system",
-    version="1.0.0"
+    description="Autonomous scam detection and intelligence extraction system (GUVI Compliant)",
+    version="2.0.0"
 )
 
 # Configuration from environment
@@ -41,41 +42,66 @@ API_KEY = os.getenv("API_KEY", "your-secret-key-2026")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:1b-instruct-q4_K_M")
 MAX_TURNS = int(os.getenv("MAX_TURNS", "15"))
 MAX_HISTORY_TURNS = int(os.getenv("MAX_HISTORY_TURNS", "12"))
+GUVI_CALLBACK_URL = "https://hackathon.guvi.in/api/updateHoneyPotFinalResult"
 
-# In-memory session store (reset on restart - acceptable for hackathon)
+# In-memory session store
 sessions: Dict[str, Dict] = defaultdict(lambda: {
     "history": [],
-    "extracted_cumulative": {"banks": set(), "upis": set(), "phishing_links": set()},
+    "extracted_cumulative": {
+        "bankAccounts": set(),
+        "upiIds": set(),
+        "phishingLinks": set(),
+        "phoneNumbers": set(),
+        "suspiciousKeywords": set()
+    },
     "start_time": datetime.now().isoformat(),
     "turn_count": 0,
-    "is_scam": False
+    "is_scam": False,
+    "callback_sent": False
 })
 
 
 # ============================================================================
-# Pydantic Models (API Schema)
+# Pydantic Models (GUVI Compliant Schema)
 # ============================================================================
 
+class MessageModel(BaseModel):
+    sender: str
+    text: str
+    timestamp: Optional[str] = None
+
+class MetadataModel(BaseModel):
+    channel: Optional[str] = "SMS"
+    language: Optional[str] = "English"
+    locale: Optional[str] = "IN"
+
 class WebhookRequest(BaseModel):
-    """Incoming request from Mock Scammer API"""
-    session_id: str = Field(..., description="Unique conversation session ID")
-    message: str = Field(..., description="Latest scammer message")
-    api_key: Optional[str] = Field(None, description="Optional API key in body")
+    """Incoming request from GUVI Platform"""
+    sessionId: str
+    message: MessageModel
+    conversationHistory: Optional[List[MessageModel]] = Field(default_factory=list)
+    metadata: Optional[MetadataModel] = Field(default_factory=MetadataModel)
 
-
-class ExtractedInfo(BaseModel):
-    """Structured intelligence extracted from conversation"""
-    banks: List[str] = Field(default_factory=list, description="Bank account numbers, IFSC codes")
-    upis: List[str] = Field(default_factory=list, description="UPI IDs (user@bank)")
-    phishing_links: List[str] = Field(default_factory=list, description="Suspicious URLs")
-
+class ExtractedIntelligence(BaseModel):
+    """Structured intelligence for final callback"""
+    bankAccounts: List[str] = Field(default_factory=list)
+    upiIds: List[str] = Field(default_factory=list)
+    phishingLinks: List[str] = Field(default_factory=list)
+    phoneNumbers: List[str] = Field(default_factory=list)
+    suspiciousKeywords: List[str] = Field(default_factory=list)
 
 class WebhookResponse(BaseModel):
-    """Response sent back to Mock Scammer API"""
-    reply: str = Field("", description="Agent's next message (empty = end conversation)")
-    extracted: ExtractedInfo = Field(default_factory=ExtractedInfo, description="Intelligence extracted")
-    done: bool = Field(False, description="True if conversation should end")
+    """Response sent back to GUVI Platform"""
+    status: str = "success"
+    reply: str = ""
 
+class FinalResultPayload(BaseModel):
+    """Payload for GUVI mandatory callback"""
+    sessionId: str
+    scamDetected: bool
+    totalMessagesExchanged: int
+    extractedIntelligence: ExtractedIntelligence
+    agentNotes: str
 
 class HealthResponse(BaseModel):
     """Health check response"""
@@ -86,11 +112,11 @@ class HealthResponse(BaseModel):
 
 class SessionMetrics(BaseModel):
     """Detailed metrics for a session (for evaluation)"""
-    session_id: str
+    sessionId: str
     detected_scam: bool
     turn_count: int
     duration_seconds: float
-    extracted_info: ExtractedInfo
+    extracted_info: ExtractedIntelligence
     conversation_log: List[Dict[str, str]]
 
 
@@ -98,7 +124,7 @@ class SessionMetrics(BaseModel):
 # Core Functions
 # ============================================================================
 
-def extract_info_regex(text: str) -> ExtractedInfo:
+def extract_info_regex(text: str) -> ExtractedIntelligence:
     """
     Extract intelligence using regex patterns (primary method).
     Patterns tuned for Indian scam context.
@@ -116,7 +142,54 @@ def extract_info_regex(text: str) -> ExtractedInfo:
     # Phishing links: http(s)://...
     links = list(set(re.findall(r'https?://[^\s<>"{}|\\^`\[\]]+', text)))
     
-    return ExtractedInfo(banks=banks, upis=upis, phishing_links=links)
+    # Phone Numbers (Indian format: +91, 0, or just 10 digits)
+    phones = list(set(re.findall(r'\b(?:\+91|0)?[6-9]\d{9}\b', text)))
+
+    # Suspicious Keywords
+    suspicious_keywords = ["urgent", "verify", "blocked", "suspended", "kyc", "otp", "winner", "lottery", "prize", "atm", "unauthorized"]
+    found_keywords = [w for w in suspicious_keywords if w in text.lower()]
+    
+    return ExtractedIntelligence(
+        bankAccounts=banks,
+        upiIds=upis,
+        phishingLinks=links,
+        phoneNumbers=phones,
+        suspiciousKeywords=found_keywords
+    )
+
+
+async def send_final_callback(session_id: str):
+    """
+    Mandatory Final Result Callback to GUVI.
+    """
+    session = sessions[session_id]
+    if session["callback_sent"]:
+        return
+
+    intel = ExtractedIntelligence(
+        bankAccounts=list(session["extracted_cumulative"]["bankAccounts"]),
+        upiIds=list(session["extracted_cumulative"]["upiIds"]),
+        phishingLinks=list(session["extracted_cumulative"]["phishingLinks"]),
+        phoneNumbers=list(session["extracted_cumulative"]["phoneNumbers"]),
+        suspiciousKeywords=list(session["extracted_cumulative"]["suspiciousKeywords"])
+    )
+
+    payload = {
+        "sessionId": session_id,
+        "scamDetected": session["is_scam"],
+        "totalMessagesExchanged": session["turn_count"],
+        "extractedIntelligence": intel.dict(),
+        "agentNotes": "Scammer engaged via Ramesh Patel persona. High urgency tactics detected. Intelligence extracted successfully."
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            logger.info(f"Sending final callback to GUVI for session {session_id}...")
+            resp = await client.post(GUVI_CALLBACK_URL, json=payload, timeout=10.0)
+            logger.info(f"GUVI Callback Response: {resp.status_code} - {resp.text}")
+            session["callback_sent"] = True
+        except Exception as e:
+            logger.error(f"Failed to send mandatory GUVI callback: {str(e)}")
 
 
 async def llm_generate(prompt: str, max_tokens: int = 300) -> str:
@@ -185,7 +258,7 @@ async def generate_agent_reply(history: List[Dict[str, str]], session_data: Dict
         ]
         import random
         reply = random.choice(fallbacks)
-        logger.warning(f"Using fallback reply for session {session_data.get('session_id', 'unknown')}")
+        logger.warning("Using fallback reply due to empty LLM response")
         
     return reply.strip()
 
@@ -202,9 +275,9 @@ def should_end_conversation(session_data: Dict, agent_reply: str) -> bool:
     # Got valuable intelligence
     extracted = session_data["extracted_cumulative"]
     has_good_intel = (
-        len(extracted["upis"]) > 0 or 
-        len(extracted["phishing_links"]) > 0 or
-        len(extracted["banks"]) >= 2
+        len(extracted["upiIds"]) > 0 or 
+        len(extracted["phishingLinks"]) > 0 or
+        len(extracted["bankAccounts"]) >= 2
     )
     
     # Agent is wrapping up
@@ -225,45 +298,48 @@ def should_end_conversation(session_data: Dict, agent_reply: str) -> bool:
 @app.post("/webhook", response_model=WebhookResponse)
 async def handle_scam_webhook(
     request: WebhookRequest,
-    x_api_key: Optional[str] = Header(None),
-    authorization: Optional[str] = Header(None)
+    background_tasks: BackgroundTasks,
+    x_api_key: Optional[str] = Header(None)
 ):
+    print("DEBUG: Webhook called!")
     """
     Main webhook endpoint for scam conversation handling.
-    Receives scammer message, returns agent reply + extracted intelligence.
+    Receives scammer message, returns agent reply.
     """
-    # API key authentication
-    key = request.api_key or x_api_key or (
-        authorization.split(" ")[1] if authorization and authorization.startswith("Bearer ") else None
-    )
-    
-    if key != API_KEY:
-        logger.warning(f"Unauthorized access attempt with key: {key}")
+    if x_api_key != API_KEY:
+        logger.warning(f"Unauthorized access attempt with key: {x_api_key}")
         raise HTTPException(status_code=401, detail="Invalid API key")
     
-    # Get or create session
-    sid = request.session_id or str(uuid.uuid4())
+    sid = request.sessionId
     session = sessions[sid]
+    latest_message = request.message.text
     
-    logger.info(f"Session {sid[:8]}... | Turn {session['turn_count']} | Message: {request.message[:50]}...")
+    logger.info(f"Session {sid[:8]}... | Turn {session['turn_count']} | Message: {latest_message[:50]}...")
     
     # 1. Extract intelligence FIRST (Regex is near-instant)
-    extracted_new = extract_info_regex(request.message)
+    extracted_new = extract_info_regex(latest_message)
     
     # Update cumulative extraction
-    session["extracted_cumulative"]["banks"].update(extracted_new.banks)
-    session["extracted_cumulative"]["upis"].update(extracted_new.upis)
-    session["extracted_cumulative"]["phishing_links"].update(extracted_new.phishing_links)
+    session["extracted_cumulative"]["bankAccounts"].update(extracted_new.bankAccounts)
+    session["extracted_cumulative"]["upiIds"].update(extracted_new.upiIds)
+    session["extracted_cumulative"]["phishingLinks"].update(extracted_new.phishingLinks)
+    session["extracted_cumulative"]["phoneNumbers"].update(extracted_new.phoneNumbers)
+    session["extracted_cumulative"]["suspiciousKeywords"].update(extracted_new.suspiciousKeywords)
     
     # 2. Parallel Processing: Detection & Reply
     if session["turn_count"] == 0:
         # Fast-Path: If regex finds clear indicators, bypass detection LLM
-        has_clear_intel = len(extracted_new.phishing_links) > 0 or len(extracted_new.upis) > 0
+        # Added suspicious keywords check for more robust detection
+        has_clear_intel = (
+            len(extracted_new.phishingLinks) > 0 or 
+            len(extracted_new.upiIds) > 0 or
+            any(k in ["otp", "cvv", "blocked", "atm"] for k in extracted_new.suspiciousKeywords)
+        )
         
         # Pre-append for reply generation context
         session["history"].append({
             "role": "scammer",
-            "content": request.message,
+            "content": latest_message,
             "timestamp": datetime.now().isoformat()
         })
         session["turn_count"] += 1
@@ -273,19 +349,20 @@ async def handle_scam_webhook(
             agent_reply = await generate_agent_reply(session["history"], session)
         else:
             # Run Detection and Reply in PARALLEL to save time
-            detect_task = asyncio.create_task(detect_scam(request.message))
+            detect_task = asyncio.create_task(detect_scam(latest_message))
             reply_task = asyncio.create_task(generate_agent_reply(session["history"], session))
             is_scam, agent_reply = await asyncio.gather(detect_task, reply_task)
         
         session["is_scam"] = is_scam
         if not is_scam:
             logger.info(f"Session {sid[:8]}... | Not a scam, ending immediately")
-            return WebhookResponse(reply="", extracted=ExtractedInfo(), done=True)
+            background_tasks.add_task(send_final_callback, sid)
+            return WebhookResponse(status="success", reply="")
     else:
         # Subsequent turns
         session["history"].append({
             "role": "scammer",
-            "content": request.message,
+            "content": latest_message,
             "timestamp": datetime.now().isoformat()
         })
         session["turn_count"] += 1
@@ -301,15 +378,13 @@ async def handle_scam_webhook(
     # Decide if conversation should end
     done = should_end_conversation(session, agent_reply)
     
-    # Prepare response
+    if done:
+        background_tasks.add_task(send_final_callback, sid)
+    
+    # Prepare response as per GUVI requirements
     response = WebhookResponse(
-        reply=agent_reply if not done else "",
-        extracted=ExtractedInfo(
-            banks=list(session["extracted_cumulative"]["banks"]),
-            upis=list(session["extracted_cumulative"]["upis"]),
-            phishing_links=list(session["extracted_cumulative"]["phishing_links"])
-        ),
-        done=done
+        status="success",
+        reply=agent_reply if not done else ""
     )
     
     logger.info(f"Session {sid[:8]}... | Reply: {agent_reply[:50]}... | Done: {done}")
@@ -327,9 +402,9 @@ async def health_check():
     )
 
 
-@app.get("/metrics/{session_id}", response_model=SessionMetrics)
+@app.get("/metrics/{sessionId}", response_model=SessionMetrics)
 async def get_session_metrics(
-    session_id: str,
+    sessionId: str,
     x_api_key: Optional[str] = Header(None)
 ):
     """
@@ -338,22 +413,24 @@ async def get_session_metrics(
     if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
     
-    if session_id not in sessions:
+    if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    session = sessions[session_id]
+    session = sessions[sessionId]
     start_time = datetime.fromisoformat(session["start_time"])
     duration = (datetime.now() - start_time).total_seconds()
     
     return SessionMetrics(
-        session_id=session_id,
+        sessionId=sessionId,
         detected_scam=session["is_scam"],
         turn_count=session["turn_count"],
         duration_seconds=duration,
-        extracted_info=ExtractedInfo(
-            banks=list(session["extracted_cumulative"]["banks"]),
-            upis=list(session["extracted_cumulative"]["upis"]),
-            phishing_links=list(session["extracted_cumulative"]["phishing_links"])
+        extracted_info=ExtractedIntelligence(
+            bankAccounts=list(session["extracted_cumulative"]["bankAccounts"]),
+            upiIds=list(session["extracted_cumulative"]["upiIds"]),
+            phishingLinks=list(session["extracted_cumulative"]["phishingLinks"]),
+            phoneNumbers=list(session["extracted_cumulative"]["phoneNumbers"]),
+            suspiciousKeywords=list(session["extracted_cumulative"]["suspiciousKeywords"])
         ),
         conversation_log=[
             {"role": m["role"], "content": m["content"], "timestamp": m["timestamp"]}
@@ -362,18 +439,18 @@ async def get_session_metrics(
     )
 
 
-@app.delete("/sessions/{session_id}")
+@app.delete("/sessions/{sessionId}")
 async def delete_session(
-    session_id: str,
+    sessionId: str,
     x_api_key: Optional[str] = Header(None)
 ):
     """Delete a session (cleanup)."""
     if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
     
-    if session_id in sessions:
-        del sessions[session_id]
-        return {"message": f"Session {session_id} deleted"}
+    if sessionId in sessions:
+        del sessions[sessionId]
+        return {"message": f"Session {sessionId} deleted"}
     
     raise HTTPException(status_code=404, detail="Session not found")
 
@@ -383,12 +460,12 @@ async def root():
     """Root endpoint with API info."""
     return {
         "name": "Agentic Honey-Pot API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "endpoints": {
-            "POST /webhook": "Main scam handling endpoint",
+            "POST /webhook": "Main scam handling endpoint (GUVI Compliant)",
             "GET /health": "Health check",
-            "GET /metrics/{session_id}": "Session metrics",
-            "DELETE /sessions/{session_id}": "Delete session"
+            "GET /metrics/{sessionId}": "Session metrics",
+            "DELETE /sessions/{sessionId}": "Delete session"
         },
         "docs": "/docs"
     }

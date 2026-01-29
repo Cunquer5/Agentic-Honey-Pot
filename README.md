@@ -32,7 +32,7 @@ A hackathon-ready API that detects scam messages, engages scammers in natural co
 │ API (Evaluator) │
 └────────┬────────┘
          │ POST /webhook
-         │ {session_id, message}
+         │ {sessionId, message}
          ▼
 ┌─────────────────────────────────┐
 │  FastAPI Server                 │
@@ -135,13 +135,23 @@ python test_api.py
 
 ### POST `/webhook`
 
-Main endpoint for scam conversation handling.
+Main endpoint for scam conversation handling (GUVI Compliant).
 
 **Request:**
 ```json
 {
-  "session_id": "abc123",
-  "message": "Hello sir, your ATM card is blocked..."
+  "sessionId": "abc123",
+  "message": {
+    "sender": "scammer",
+    "text": "Hello sir, your ATM card is blocked...",
+    "timestamp": "2026-01-27T10:00:00"
+  },
+  "conversationHistory": [],
+  "metadata": {
+    "channel": "SMS",
+    "language": "English",
+    "locale": "IN"
+  }
 }
 ```
 
@@ -153,13 +163,8 @@ X-API-Key: your-secret-key-2026
 **Response:**
 ```json
 {
-  "reply": "Namaste, kya problem hai beta?",
-  "extracted": {
-    "banks": ["SBIN0001234", "9876543210123456"],
-    "upis": ["scammer@paytm"],
-    "phishing_links": ["https://fake-icici.com"]
-  },
-  "done": false
+  "status": "success",
+  "reply": "Namaste, kya problem hai beta?"
 }
 ```
 
@@ -171,12 +176,12 @@ Health check endpoint.
 ```json
 {
   "status": "ok",
-  "model": "qwen2.5:7b-instruct-q5_K_M",
+  "model": "llama3.2:1b-instruct-q4_K_M",
   "sessions_active": 3
 }
 ```
 
-### GET `/metrics/{session_id}`
+### GET `/metrics/{sessionId}`
 
 Get detailed metrics for a session.
 
@@ -188,27 +193,28 @@ X-API-Key: your-secret-key-2026
 **Response:**
 ```json
 {
-  "session_id": "abc123",
+  "sessionId": "abc123",
   "detected_scam": true,
   "turn_count": 8,
   "duration_seconds": 45.2,
   "extracted_info": {
-    "banks": ["SBIN0001234"],
-    "upis": ["scammer@paytm"],
-    "phishing_links": ["https://fake-bank.com"]
+    "bankAccounts": ["SBIN0001234"],
+    "upiIds": ["scammer@paytm"],
+    "phishingLinks": ["https://fake-bank.com"],
+    "phoneNumbers": ["919876543210"],
+    "suspiciousKeywords": ["blocked", "urgent"]
   },
   "conversation_log": [
     {
       "role": "scammer",
       "content": "Hello sir...",
       "timestamp": "2026-01-27T01:30:00"
-    },
-    ...
+    }
   ]
 }
 ```
 
-### DELETE `/sessions/{session_id}`
+### DELETE `/sessions/{sessionId}`
 
 Delete a session (cleanup).
 
@@ -222,8 +228,8 @@ curl -X POST http://localhost:8000/webhook \
   -H "X-API-Key: your-secret-key-2026" \
   -H "Content-Type: application/json" \
   -d '{
-    "session_id": "test1",
-    "message": "Your ATM card is blocked. Share OTP to unblock."
+    "sessionId": "test1",
+    "message": {"sender": "scammer", "text": "Your ATM card is blocked. Share OTP to unblock."}
   }'
 
 # Check health

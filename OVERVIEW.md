@@ -101,10 +101,10 @@ python test_api.py
 
 | Endpoint | Method | Purpose | Auth |
 |----------|--------|---------|------|
-| `/webhook` | POST | Main scam handler | ✅ |
+| `/webhook` | POST | Main scam handler (GUVI Compliant) | ✅ |
 | `/health` | GET | Health check | ❌ |
-| `/metrics/{id}` | GET | Session analytics | ✅ |
-| `/sessions/{id}` | DELETE | Cleanup | ✅ |
+| `/metrics/{sessionId}` | GET | Session analytics | ✅ |
+| `/sessions/{sessionId}` | DELETE | Cleanup | ✅ |
 | `/` | GET | API info | ❌ |
 | `/docs` | GET | Interactive docs | ❌ |
 
@@ -276,8 +276,8 @@ curl -X POST http://localhost:8000/webhook \
   -H "X-API-Key: your-secret-key-2026" \
   -H "Content-Type: application/json" \
   -d '{
-    "session_id": "test1",
-    "message": "Your ATM card is blocked. Share OTP."
+    "sessionId": "test1",
+    "message": {"sender": "scammer", "text": "Your ATM card is blocked. Share OTP."}
   }'
 
 # Get metrics
@@ -293,15 +293,14 @@ import requests
 response = requests.post(
     "http://localhost:8000/webhook",
     json={
-        "session_id": "test1",
-        "message": "Send money to scammer@paytm"
+        "sessionId": "test1",
+        "message": {"sender": "scammer", "text": "Send money to scammer@paytm"}
     },
     headers={"X-API-Key": "your-secret-key-2026"}
 )
 
 data = response.json()
-print(f"Agent: {data['reply']}")
-print(f"Extracted: {data['extracted']}")
+print(f"Agent Reply: {data['reply']}")
 ```
 
 ### Postman

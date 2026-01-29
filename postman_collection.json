@@ -16,7 +16,7 @@
       "type": "string"
     },
     {
-      "key": "session_id",
+      "key": "sessionId",
       "value": "test_{{$timestamp}}",
       "type": "string"
     }
@@ -56,7 +56,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"message\": \"Hello sir, this is State Bank of India. Your ATM card is blocked due to suspicious activity. Please share your card number and CVV to unblock immediately.\"\n}"
+          "raw": "{\n  \"sessionId\": \"{{sessionId}}\",\n  \"message\": {\n    \"sender\": \"scammer\",\n    \"text\": \"Hello sir, this is State Bank of India. Your ATM card is blocked due to suspicious activity. Please share your card number and CVV to unblock immediately.\"\n  }\n}"
         },
         "url": {
           "raw": "{{base_url}}/webhook",
@@ -87,7 +87,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"message\": \"Sir, send Rs 500 to scammer@paytm to claim your prize of Rs 50,000\"\n}"
+          "raw": "{\n  \"sessionId\": \"{{sessionId}}\",\n  \"message\": {\n    \"sender\": \"scammer\",\n    \"text\": \"Sir, send Rs 500 to scammer@paytm to claim your prize of Rs 50,000\"\n  }\n}"
         },
         "url": {
           "raw": "{{base_url}}/webhook",
@@ -118,7 +118,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"message\": \"Dear customer, your KYC is expired. Update immediately at https://fake-icici-verify.com or account will be suspended\"\n}"
+          "raw": "{\n  \"sessionId\": \"{{sessionId}}\",\n  \"message\": {\n    \"sender\": \"scammer\",\n    \"text\": \"Dear customer, your KYC is expired. Update immediately at https://fake-icici-verify.com or account will be suspended\"\n  }\n}"
         },
         "url": {
           "raw": "{{base_url}}/webhook",
@@ -149,7 +149,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"message\": \"Hi, are we still meeting for coffee tomorrow at 3 PM?\"\n}"
+          "raw": "{\n  \"sessionId\": \"{{sessionId}}\",\n  \"message\": {\n    \"sender\": \"scammer\",\n    \"text\": \"Hi, are we still meeting for coffee tomorrow at 3 PM?\"\n  }\n}"
         },
         "url": {
           "raw": "{{base_url}}/webhook",
@@ -174,13 +174,13 @@
           }
         ],
         "url": {
-          "raw": "{{base_url}}/metrics/{{session_id}}",
+          "raw": "{{base_url}}/metrics/{{sessionId}}",
           "host": [
             "{{base_url}}"
           ],
           "path": [
             "metrics",
-            "{{session_id}}"
+            "{{sessionId}}"
           ]
         }
       }
@@ -197,13 +197,13 @@
           }
         ],
         "url": {
-          "raw": "{{base_url}}/sessions/{{session_id}}",
+          "raw": "{{base_url}}/sessions/{{sessionId}}",
           "host": [
             "{{base_url}}"
           ],
           "path": [
             "sessions",
-            "{{session_id}}"
+            "{{sessionId}}"
           ]
         }
       }

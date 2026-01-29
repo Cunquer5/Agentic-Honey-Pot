@@ -7,6 +7,7 @@ import os
 import requests
 import json
 import time
+from datetime import datetime
 from typing import Dict, List
 from dotenv import load_dotenv
 
@@ -70,13 +71,32 @@ def test_scam_conversation(initial_message: str, session_id: str = None) -> Dict
         print(f"\n--- Turn {turn + 1} ---")
         print(f"Scammer: {current_message}")
         
+        # Prepare GUVI-compliant payload
+        payload = {
+            "sessionId": session_id,
+            "message": {
+                "sender": "scammer",
+                "text": current_message,
+                "timestamp": datetime.now().isoformat()
+            },
+            "conversationHistory": [
+                {
+                    "sender": "scammer" if m["scammer"] == m["scammer"] else "user",
+                    "text": m["scammer"] if m.get("scammer") else m["agent"],
+                    "timestamp": datetime.now().isoformat()
+                } for m in conversation_log
+            ],
+            "metadata": {
+                "channel": "SMS",
+                "language": "English",
+                "locale": "IN"
+            }
+        }
+
         # Send webhook request
         response = requests.post(
             f"{BASE_URL}/webhook",
-            json={
-                "session_id": session_id,
-                "message": current_message
-            },
+            json=payload,
             headers={"X-API-Key": API_KEY}
         )
         
@@ -85,19 +105,18 @@ def test_scam_conversation(initial_message: str, session_id: str = None) -> Dict
             break
         
         data = response.json()
+        agent_reply = data.get("reply", "")
+        
         conversation_log.append({
             "turn": turn + 1,
             "scammer": current_message,
-            "agent": data["reply"],
-            "extracted": data["extracted"],
-            "done": data["done"]
+            "agent": agent_reply,
+            "done": agent_reply == ""
         })
         
-        print(f"Agent: {data['reply']}")
-        print(f"Extracted: {data['extracted']}")
-        print(f"Done: {data['done']}")
+        print(f"Agent: {agent_reply}")
         
-        if data["done"]:
+        if agent_reply == "":
             print("\n✓ Conversation ended")
             break
         
@@ -139,9 +158,11 @@ def test_metrics(session_id: str):
         print(f"  Total turns: {metrics['turn_count']}")
         print(f"  Duration: {metrics['duration_seconds']:.2f}s")
         print(f"  Extracted info:")
-        print(f"    Banks: {metrics['extracted_info']['banks']}")
-        print(f"    UPIs: {metrics['extracted_info']['upis']}")
-        print(f"    Links: {metrics['extracted_info']['phishing_links']}")
+        print(f"    Banks: {metrics['extracted_info']['bankAccounts']}")
+        print(f"    UPIs: {metrics['extracted_info']['upiIds']}")
+        print(f"    Links: {metrics['extracted_info']['phishingLinks']}")
+        print(f"    Phones: {metrics['extracted_info']['phoneNumbers']}")
+        print(f"    Keywords: {metrics['extracted_info']['suspiciousKeywords']}")
         return metrics
     else:
         print(f"Error: {response.status_code} - {response.text}")
@@ -157,17 +178,17 @@ def test_non_scam_detection():
         response = requests.post(
             f"{BASE_URL}/webhook",
             json={
-                "session_id": f"nonscam_{int(time.time())}",
-                "message": msg
+                "sessionId": f"nonscam_{int(time.time())}",
+                "message": {"sender": "scammer", "text": msg, "timestamp": datetime.now().isoformat()}
             },
             headers={"X-API-Key": API_KEY}
         )
         
         data = response.json()
-        print(f"Done immediately: {data['done']}")
-        print(f"Reply: '{data['reply']}'")
+        reply = data.get("reply", "")
+        print(f"Reply: '{reply}'")
         
-        if data['done'] and data['reply'] == "":
+        if reply == "":
             print("✓ Correctly identified as non-scam")
         else:
             print("✗ False positive - treated as scam")
@@ -183,8 +204,8 @@ def test_authentication():
     response = requests.post(
         f"{BASE_URL}/webhook",
         json={
-            "session_id": "test",
-            "message": "test"
+            "sessionId": "test",
+            "message": {"sender": "scammer", "text": "test"}
         }
     )
     print(f"Without API key: {response.status_code} (expected 401)")
@@ -193,8 +214,8 @@ def test_authentication():
     response = requests.post(
         f"{BASE_URL}/webhook",
         json={
-            "session_id": "test",
-            "message": "test"
+            "sessionId": "test",
+            "message": {"sender": "scammer", "text": "test"}
         },
         headers={"X-API-Key": "wrong-key"}
     )
@@ -204,8 +225,8 @@ def test_authentication():
     response = requests.post(
         f"{BASE_URL}/webhook",
         json={
-            "session_id": "test_auth",
-            "message": "Hello"
+            "sessionId": "test_auth",
+            "message": {"sender": "scammer", "text": "Hello"}
         },
         headers={"X-API-Key": API_KEY}
     )

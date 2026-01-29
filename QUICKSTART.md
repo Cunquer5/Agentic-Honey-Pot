@@ -161,7 +161,7 @@ python benchmark.py         # Performance benchmarks
 curl -X POST http://localhost:8000/webhook ^
   -H "X-API-Key: your-secret-key-2026" ^
   -H "Content-Type: application/json" ^
-  -d "{\"session_id\": \"test1\", \"message\": \"Your account is blocked\"}"
+  -d "{\"sessionId\": \"test1\", \"message\": {\"sender\": \"scammer\", \"text\": \"Your account is blocked\"}}"
 ```
 
 ## Success Checklist

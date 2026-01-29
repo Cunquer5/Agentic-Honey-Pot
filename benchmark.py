@@ -68,12 +68,13 @@ def benchmark_detection_accuracy() -> Dict:
         print(f"\nTest {i+1}/{len(TEST_SCAMS)}: {test['message'][:50]}...")
         
         start = time.time()
+        payload = {
+            "sessionId": f"bench_detect_{i}",
+            "message": {"sender": "scammer", "text": test["message"]}
+        }
         response = requests.post(
             f"{BASE_URL}/webhook",
-            json={
-                "session_id": f"bench_detect_{i}",
-                "message": test["message"]
-            },
+            json=payload,
             headers={"X-API-Key": API_KEY}
         )
         latency = time.time() - start
@@ -82,7 +83,7 @@ def benchmark_detection_accuracy() -> Dict:
         data = response.json()
         
         # Check if correctly identified
-        detected_as_scam = not (data["done"] and data["reply"] == "")
+        detected_as_scam = data.get("reply", "") != ""
         
         if detected_as_scam == test["is_scam"]:
             results["correct"] += 1
@@ -125,21 +126,27 @@ def benchmark_extraction_quality() -> Dict:
     for i, test in enumerate(TEST_SCAMS[:4]):  # Only scam messages
         print(f"\nTest {i+1}: {test['message'][:50]}...")
         
+        payload = {
+            "sessionId": f"bench_extract_{i}",
+            "message": {"sender": "scammer", "text": test["message"]}
+        }
         response = requests.post(
             f"{BASE_URL}/webhook",
-            json={
-                "session_id": f"bench_extract_{i}",
-                "message": test["message"]
-            },
+            json=payload,
             headers={"X-API-Key": API_KEY}
         )
         
-        data = response.json()
-        extracted = data["extracted"]
+        # Get metrics to see extraction (extracted is not in webhook response anymore)
+        metrics_resp = requests.get(
+            f"{BASE_URL}/metrics/bench_extract_{i}",
+            headers={"X-API-Key": API_KEY}
+        )
+        data = metrics_resp.json()
+        extracted = data["extracted_info"]
         
         # Count expected vs extracted
         expected_total = sum(test["expected"].values())
-        extracted_total = len(extracted["banks"]) + len(extracted["upis"]) + len(extracted["phishing_links"])
+        extracted_total = len(extracted["bankAccounts"]) + len(extracted["upiIds"]) + len(extracted["phishingLinks"])
         
         results["total_items"] += expected_total
         results["extracted_items"] += min(extracted_total, expected_total)
@@ -149,7 +156,7 @@ def benchmark_extraction_quality() -> Dict:
             results["precision_scores"].append(precision)
         
         print(f"Expected: {expected_total}, Extracted: {extracted_total}")
-        print(f"  Banks: {len(extracted['banks'])}, UPIs: {len(extracted['upis'])}, Links: {len(extracted['phishing_links'])}")
+        print(f"  Banks: {len(extracted['bankAccounts'])}, UPIs: {len(extracted['upiIds'])}, Links: {len(extracted['phishingLinks'])}")
         
         time.sleep(0.5)
     
@@ -178,12 +185,13 @@ def benchmark_latency() -> Dict:
     
     for i in range(num_requests):
         start = time.time()
+        payload = {
+            "sessionId": f"bench_latency_{i}",
+            "message": {"sender": "scammer", "text": test_message}
+        }
         response = requests.post(
             f"{BASE_URL}/webhook",
-            json={
-                "session_id": f"bench_latency_{i}",
-                "message": test_message
-            },
+            json=payload,
             headers={"X-API-Key": API_KEY}
         )
         latency = time.time() - start

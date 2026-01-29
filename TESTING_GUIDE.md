@@ -249,7 +249,7 @@ For convenience, use the interactive test runner:
 curl -X POST http://localhost:8000/webhook `
   -H "X-API-Key: your-secret-key-2026" `
   -H "Content-Type: application/json" `
-  -d "{\"session_id\": \"manual_test_1\", \"message\": \"Your ATM card is blocked. Share OTP to unblock.\"}"
+  -d "{\"sessionId\": \"manual_test_1\", \"message\": {\"sender\": \"scammer\", \"text\": \"Your ATM card is blocked. Share OTP to unblock.\"}}"
 ```
 
 **Check metrics**:

@@ -8,7 +8,9 @@ A production-ready API system that autonomously detects scam messages, engages s
 ### Core Components
 
 1. **FastAPI Server** (`app.py`)
-   - 437 lines of production-quality code
+   - ~490 lines of production-quality code
+   - GUVI Compliant Pydantic models (sessionId, message, conversationHistory)
+   - Mandatory Final Callback logic (`https://hackathon.guvi.in/api/updateHoneyPotFinalResult`)
    - 4 main endpoints (webhook, health, metrics, session management)
    - API key authentication
    - Comprehensive error handling
@@ -136,10 +138,10 @@ fusion-meteoroid/
 ## API Endpoints Summary
 
 ### POST `/webhook`
-**Purpose**: Main scam conversation handler  
-**Auth**: API key (header or body)  
-**Input**: `{session_id, message}`  
-**Output**: `{reply, extracted, done}`  
+**Purpose**: Main scam conversation handler (GUVI Compliant)
+**Auth**: API key (header)
+**Input**: `{sessionId, message: {sender, text}, conversationHistory, metadata}`
+**Output**: `{status: "success", reply}`
 **Logic**:
 1. Authenticate
 2. Detect scam (first message only)
@@ -152,12 +154,12 @@ fusion-meteoroid/
 **Purpose**: Health monitoring  
 **Output**: `{status, model, sessions_active}`
 
-### GET `/metrics/{session_id}`
-**Purpose**: Session analytics  
-**Auth**: API key  
-**Output**: Full conversation log + metrics
+### GET `/metrics/{sessionId}`
+**Purpose**: Session analytics
+**Auth**: API key
+**Output**: Full conversation log + extractedIntelligence (bankAccounts, upiIds, phishingLinks, phoneNumbers, suspiciousKeywords)
 
-### DELETE `/sessions/{session_id}`
+### DELETE `/sessions/{sessionId}`
 **Purpose**: Session cleanup  
 **Auth**: API key
 

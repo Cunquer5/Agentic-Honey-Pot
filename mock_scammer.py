@@ -127,12 +127,19 @@ def simulate_conversation(api_url: str, api_key: str, max_turns: int = 10):
         
         # Send to API
         try:
+            payload = {
+                "sessionId": session_id,
+                "message": {
+                    "sender": "scammer",
+                    "text": current_message,
+                    "timestamp": ""
+                },
+                "conversationHistory": [], # Simplified for mock
+                "metadata": {"channel": "Chat"}
+            }
             response = requests.post(
                 f"{api_url}/webhook",
-                json={
-                    "session_id": session_id,
-                    "message": current_message
-                },
+                json=payload,
                 headers={"X-API-Key": api_key},
                 timeout=30
             )
@@ -143,20 +150,10 @@ def simulate_conversation(api_url: str, api_key: str, max_turns: int = 10):
                 break
             
             data = response.json()
-            agent_reply = data["reply"]
-            extracted = data["extracted"]
-            done = data["done"]
+            agent_reply = data.get("reply", "")
+            done = agent_reply == ""
             
             print(f"🟢 Agent: {agent_reply}")
-            
-            if extracted["banks"] or extracted["upis"] or extracted["phishing_links"]:
-                print(f"📊 Extracted:")
-                if extracted["banks"]:
-                    print(f"   Banks: {extracted['banks']}")
-                if extracted["upis"]:
-                    print(f"   UPIs: {extracted['upis']}")
-                if extracted["phishing_links"]:
-                    print(f"   Links: {extracted['phishing_links']}")
             
             if done:
                 print(f"\n✅ Conversation ended by agent")
@@ -191,9 +188,11 @@ def simulate_conversation(api_url: str, api_key: str, max_turns: int = 10):
             print(f"Duration: {metrics['duration_seconds']:.1f}s")
             print(f"Detected as scam: {metrics['detected_scam']}")
             print(f"\nFinal extracted intelligence:")
-            print(f"  Banks: {metrics['extracted_info']['banks']}")
-            print(f"  UPIs: {metrics['extracted_info']['upis']}")
-            print(f"  Phishing links: {metrics['extracted_info']['phishing_links']}")
+            print(f"  Banks: {metrics['extracted_info']['bankAccounts']}")
+            print(f"  UPIs: {metrics['extracted_info']['upiIds']}")
+            print(f"  Phishing links: {metrics['extracted_info']['phishingLinks']}")
+            print(f"  Phone Numbers: {metrics['extracted_info']['phoneNumbers']}")
+            print(f"  Suspicious Keywords: {metrics['extracted_info']['suspiciousKeywords']}")
     except Exception as e:
         print(f"Could not fetch metrics: {e}")
 

@@ -42,7 +42,7 @@ set /p choice="Enter choice (1-5): "
 if "%choice%"=="1" (
     echo.
     echo Running health check...
-    curl http://localhost:8000/health
+    curl %BASE_URL%/health
     echo.
 ) else if "%choice%"=="2" (
     echo.
@@ -61,7 +61,7 @@ if "%choice%"=="1" (
     echo Running all tests...
     echo.
     echo === Health Check ===
-    curl http://localhost:8000/health
+    curl %BASE_URL%/health
     echo.
     echo.
     echo === Full Test Suite ===
