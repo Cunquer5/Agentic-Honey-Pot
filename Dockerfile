@@ -6,23 +6,25 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Ollama
-RUN curl -fsSL https://ollama.com/install.sh | sh
+# Install Ollama binary directly (more reliable in Docker)
+RUN curl -L https://ollama.com/download/ollama-linux-amd64 -o /usr/bin/ollama && \
+    chmod +x /usr/bin/ollama
 
-# Set up a non-root user for Hugging Face (UID 1000)
-# We use '|| true' in case the user already exists in the base image
-RUN useradd -m -u 1000 user || true
+# Hugging Face already has a user with UID 1000 in their runtime environment.
+# We create it locally for build compatibility.
+RUN useradd -m -u 1000 user || echo "User exists"
 
-# Create app directory and set permissions
+# Set up environment and directories
 WORKDIR /app
 RUN chown -R user:user /app
-
-# Switch to the non-root user
 USER user
 ENV HOME=/home/user
 ENV PATH="/home/user/.local/bin:${PATH}"
 ENV OLLAMA_HOST=127.0.0.1
 ENV OLLAMA_HOME=/home/user/.ollama
+
+# Create Ollama directory with proper permissions
+RUN mkdir -p /home/user/.ollama && chown -R user:user /home/user/.ollama
 
 # Copy requirements first for better caching
 COPY --chown=user:user requirements.txt .
