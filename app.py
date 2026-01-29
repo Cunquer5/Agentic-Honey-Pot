@@ -122,100 +122,72 @@ def extract_info_regex(text: str) -> ExtractedInfo:
 async def llm_generate(prompt: str, max_tokens: int = 300) -> str:
     """
     Call local Ollama LLM asynchronously with error handling.
-    Returns generated text or error message.
     """
     try:
-        logger.info(f"LLM call with {len(prompt)} chars prompt, max_tokens={max_tokens}")
-        client = AsyncClient()
+        # Better host detection for AsyncClient
+        host = os.getenv("OLLAMA_HOST", "127.0.0.1")
+        if "://" not in host:
+            host = f"http://{host}:11434"
+        
+        logger.info(f"LLM call to {host} | Model: {OLLAMA_MODEL}")
+        client = AsyncClient(host=host)
+        
         response = await client.generate(
             model=OLLAMA_MODEL,
             prompt=prompt,
             options={
                 "num_predict": max_tokens,
-                "temperature": 0.1,
-                "top_p": 0.1,
-                "num_ctx": 1024,
+                "temperature": 0.7,
+                "top_p": 0.9,
+                "num_ctx": 2048,
                 "num_thread": 4
             }
         )
-        result = response['response'].strip()
-        logger.info(f"LLM response: {len(result)} chars")
+        result = response.get('response', '').strip()
+        logger.info(f"LLM generated {len(result)} chars")
         return result
     except Exception as e:
         logger.error(f"LLM error: {str(e)}")
-        return f"[LLM Error: {str(e)}]"
+        return ""
 
 
 async def detect_scam(message: str) -> bool:
     """
     Binary scam detection on initial message using LLM.
-    Returns True if message is likely a scam.
     """
-    prompt = f"""Analyze if this message is a scam:
-"{message}"
-
-Answer ONLY "YES" or "NO".
-Answer:"""
-
-    response = await llm_generate(prompt, max_tokens=2)
-    is_scam = response.lower().strip().startswith("yes")
-    
-    logger.info(f"Scam detection: {is_scam} | Response: {response[:100]}")
-    return is_scam
+    prompt = f"Analyze if this message is a scam: \"{message}\"\nAnswer ONLY 'YES' or 'NO'."
+    response = await llm_generate(prompt, max_tokens=5)
+    return "yes" in response.lower()
 
 
 async def generate_agent_reply(history: List[Dict[str, str]], session_data: Dict) -> str:
     """
-    Generate agent's next conversational response using LLM.
-    Maintains persona and tries to extract information naturally.
+    Generate agent's next conversational response with fallbacks.
     """
-    # Persona definition (believable Indian elderly user)
-    persona = """You are Ramesh Patel, a 62-year-old retired bank employee from Mumbai.
-
-Your characteristics:
-- Speak simple Hindi-English mix (Hinglish), occasionally use Hindi words
-- A bit confused about modern technology, UPI, online banking
-- Helpful and trusting, want to solve the "problem" they mention
-- NEVER say you suspect a scam or are testing them
-- NEVER give real personal information (make up fake details if needed)
-- Ask innocent questions to make THEM share their bank/UPI/link details
-
-Your goal: Keep the conversation natural and try to get them to reveal their payment details, account info, or links."""
-
-    # Format conversation history
+    persona = "You are Ramesh Patel, a 62-year-old retired man from Mumbai. Reply in simple Hinglish (Hindi+English). Be confused but helpful. Ask questions to get more info."
+    
     history_text = "\n".join([
-        f"{'Caller' if m['role'] == 'scammer' else 'You'}: {m['content']}" 
-        for m in history[-MAX_HISTORY_TURNS:]
+        f"{'Scammer' if m['role'] == 'scammer' else 'Ramesh'}: {m['content']}" 
+        for m in history[-3:]
     ])
     
-    # Check if we already have good intelligence
-    extracted = session_data["extracted_cumulative"]
-    has_intel = len(extracted["upis"]) > 0 or len(extracted["phishing_links"]) > 0
+    prompt = f"{persona}\n\nChat history:\n{history_text}\n\nYour reply as Ramesh:"
     
-    if has_intel and session_data["turn_count"] >= 5:
-        end_hint = "\n\nYou have enough information now. Politely end the conversation (e.g., 'Thank you beta, I will check this')."
-    else:
-        end_hint = "\n\nKeep asking questions to get more details from them about their payment method or website."
+    reply = await llm_generate(prompt, max_tokens=50)
     
-    prompt = f"""{persona}
-
-Conversation so far:
-{history_text}
-
-{end_hint}
-
-Your turn. Reply naturally in 1-3 short sentences. Use simple Hinglish.
-Reply ONLY with the message you would say. No explanation or meta-commentary.
-
-Your reply:"""
-
-    reply = await llm_generate(prompt, max_tokens=40)
-    
-    # Clean up any meta-commentary that might slip through
-    reply = re.sub(r'\[.*?\]', '', reply)  # Remove [explanations]
-    reply = reply.strip()
-    
-    return reply
+    # FALLBACK: Ensure we ALWAYS have a reply if it's a scam
+    if not reply or len(reply) < 5:
+        fallbacks = [
+            "Beta, mere phone pe kuch error aa raha hai. Kya karun?",
+            "Arre, account block ho gaya? Main check karta hoon, thoda ruko.",
+            "Yeh link open nahi ho raha, aap phir se bhej sakte ho?",
+            "I am trying to pay but password bhool gaya. Kaise karun?"
+        ]
+        import random
+        reply = random.choice(fallbacks)
+        logger.warning(f"Using fallback reply for session {session_data.get('session_id', 'unknown')}")
+        
+    return reply.strip()
 
 
 def should_end_conversation(session_data: Dict, agent_reply: str) -> bool:
