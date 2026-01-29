@@ -3,17 +3,18 @@ Test script for Agentic Honey-Pot API
 Simulates scam conversations and validates responses.
 """
 
+import os
 import requests
 import json
 import time
 from typing import Dict, List
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configuration
-BASE_URL = "http://localhost:8000"
-
-import os
-from dotenv import load_dotenv
-load_dotenv()
+BASE_URL = os.getenv("BASE_URL", "https://Conquerer55555-Agentic-honey-pot.hf.space")
 API_KEY = os.getenv("API_KEY", "your-secret-key-2026")
 
 # Test scam messages (Indian context)

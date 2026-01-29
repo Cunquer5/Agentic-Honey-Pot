@@ -33,20 +33,19 @@ echo [OK] Ollama found
 echo.
 
 REM Check if model is downloaded
-echo Checking for LLM model...
-ollama list | findstr "llama3.2:1b-instruct-q4_K_M" >nul 2>&1
-if errorlevel 1 (
-    echo [INFO] Model not found. Downloading (this may take a few minutes)...
+echo Checking for LLM model
+ollama list | findstr /C:"llama3.2:1b-instruct-q4_K_M" >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo [INFO] Model not found. Downloading...
     ollama pull llama3.2:1b-instruct-q4_K_M
-    if errorlevel 1 (
+    if %ERRORLEVEL% NEQ 0 (
         echo [ERROR] Failed to download model
-        echo Try smaller model: ollama pull llama3.2:3b-instruct-q4_K_M
         pause
         exit /b 1
     )
 )
 
-echo [OK] Model ready
+echo [OK] Model available
 echo.
 
 REM Install Python dependencies

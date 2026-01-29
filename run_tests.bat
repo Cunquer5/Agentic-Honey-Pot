@@ -6,17 +6,27 @@ echo Running Agentic Honey-Pot Tests
 echo ========================================
 echo.
 
-REM Check if server is running
-curl -s http://localhost:8000/health >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] API server is not running
-    echo Please start the server first with: start.bat
-    echo Or manually: python app.py
-    pause
-    exit /b 1
+echo Choose environment:
+echo 1. Local (localhost:8000)
+echo 2. Cloud (Hugging Face)
+echo.
+set /p env_choice="Enter choice (1-2): "
+
+if "%env_choice%"=="2" (
+    set BASE_URL=https://Conquerer55555-Agentic-honey-pot.hf.space
+) else (
+    set BASE_URL=http://localhost:8000
+    REM Check if local server is running
+    curl -s http://localhost:8000/health >nul 2>&1
+    if errorlevel 1 (
+        echo [ERROR] Local API server is not running
+        echo Please start it with start.bat or python app.py
+        pause
+        exit /b 1
+    )
 )
 
-echo [OK] API server is running
+echo [OK] Using endpoint: %BASE_URL%
 echo.
 
 echo Choose test type:

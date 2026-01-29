@@ -205,7 +205,7 @@ if __name__ == "__main__":
     
     # Run simulation
     simulate_conversation(
-        api_url="http://localhost:8000",
+        api_url=os.getenv("BASE_URL", "https://Conquerer55555-Agentic-honey-pot.hf.space"),
         api_key=os.getenv("API_KEY", "your-secret-key-2026"),
         max_turns=10
     )

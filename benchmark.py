@@ -3,17 +3,18 @@ Benchmark script to measure system performance.
 Tests detection accuracy, latency, and extraction quality.
 """
 
+import os
 import requests
 import time
 import json
 from typing import List, Dict, Tuple
 from statistics import mean, stdev
-
-BASE_URL = "http://localhost:8000"
-
-import os
 from dotenv import load_dotenv
+
+# Load environment variables
 load_dotenv()
+
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 API_KEY = os.getenv("API_KEY", "your-secret-key-2026")
 
 # Test dataset with ground truth
