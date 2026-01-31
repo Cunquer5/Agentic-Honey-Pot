@@ -6,7 +6,7 @@ No paid services - 100% local LLM via Ollama.
 
 from fastapi import FastAPI, HTTPException, Header, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 import ollama
 from ollama import AsyncClient
 import asyncio
@@ -14,7 +14,7 @@ import re
 import uuid
 import os
 import httpx
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from collections import defaultdict
 from datetime import datetime
 import logging
@@ -66,7 +66,7 @@ sessions: Dict[str, Dict] = defaultdict(lambda: {
 # ============================================================================
 
 class MessageModel(BaseModel):
-    sender: str
+    sender: str = "scammer"
     text: str
     timestamp: Optional[str] = None
 
@@ -77,10 +77,19 @@ class MetadataModel(BaseModel):
 
 class WebhookRequest(BaseModel):
     """Incoming request from GUVI Platform"""
-    sessionId: str
-    message: MessageModel
+    model_config = ConfigDict(populate_by_name=True)
+    
+    sessionId: str = Field(alias="session_id")
+    message: Union[MessageModel, str]
     conversationHistory: Optional[List[MessageModel]] = Field(default_factory=list)
     metadata: Optional[MetadataModel] = Field(default_factory=MetadataModel)
+
+    @field_validator("message", mode="before")
+    @classmethod
+    def wrap_message_string(cls, v):
+        if isinstance(v, str):
+            return MessageModel(sender="scammer", text=v)
+        return v
 
 class ExtractedIntelligence(BaseModel):
     """Structured intelligence for final callback"""
@@ -295,6 +304,7 @@ def should_end_conversation(session_data: Dict, agent_reply: str) -> bool:
 # API Endpoints
 # ============================================================================
 
+@app.post("/", response_model=WebhookResponse)
 @app.post("/webhook", response_model=WebhookResponse)
 async def handle_scam_webhook(
     request: WebhookRequest,
@@ -310,8 +320,14 @@ async def handle_scam_webhook(
         raise HTTPException(status_code=401, detail="Invalid API key")
     
     sid = request.sessionId
+    # Handle cases where message might be the Union type
+    msg_obj = request.message
+    if isinstance(msg_obj, str):
+        latest_message = msg_obj
+    else:
+        latest_message = msg_obj.text
+    
     session = sessions[sid]
-    latest_message = request.message.text
     
     logger.info(f"Session {sid[:8]}... | Turn {session['turn_count']} | Message: {latest_message[:50]}...")
     
