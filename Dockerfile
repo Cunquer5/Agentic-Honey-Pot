@@ -32,7 +32,7 @@ RUN sed -i 's/\r$//' start.sh && \
 USER user
 ENV HOME=/home/user
 ENV PATH="/home/user/.local/bin:${PATH}"
-ENV OLLAMA_HOST=127.0.0.1
+ENV OLLAMA_HOST=localhost
 ENV OLLAMA_HOME=/home/user/.ollama
 
 # Ensure Ollama directory exists

@@ -35,8 +35,17 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Agentic Honey-Pot API",
     description="Autonomous scam detection and intelligence extraction system (GUVI Compliant)",
-    version="2.0.0"
+    version="2.0.0",
+    redirect_slashes=False
 )
+
+# Global request logger middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"Incoming request: {request.method} {request.url.path}")
+    response = await call_next(request)
+    logger.info(f"Response status: {response.status_code}")
+    return response
 
 # Enable CORS for all origins (Crucial for web-based testers)
 app.add_middleware(
@@ -217,7 +226,7 @@ async def llm_generate(prompt: str, max_tokens: int = 300) -> str:
     """
     try:
         # Better host detection for AsyncClient
-        host = os.getenv("OLLAMA_HOST", "127.0.0.1")
+        host = os.getenv("OLLAMA_HOST", "localhost")
         if "://" not in host:
             host = f"http://{host}:11434"
         
@@ -326,14 +335,18 @@ async def handle_scam_webhook(
     Receives scammer message, returns agent reply.
     """
     # Flexible authentication check
-    # Check X-API-Key header or Authorization header
-    auth_header = x_api_key or request.headers.get("Authorization")
+    # Check multiple possible header names for API keys
+    auth_header = (
+        x_api_key or 
+        request.headers.get("Authorization") or 
+        request.headers.get("apikey") or 
+        request.headers.get("api-key")
+    )
     
-    # If API_KEY is set to default and no auth provided, we allow for testing
-    # Otherwise, we enforce strict check if a custom API_KEY is set in env
+    # If API_KEY is set to default, we allow for testing
     if API_KEY != "your-secret-key-2026":
-        if auth_header != API_KEY and auth_header != f"Bearer {API_KEY}":
-            logger.warning(f"Unauthorized access attempt. Expected {API_KEY[:3]}..., Got: {auth_header}")
+        if not auth_header or (auth_header != API_KEY and auth_header != f"Bearer {API_KEY}"):
+            logger.warning(f"Unauthorized access attempt. Got: {auth_header}")
             raise HTTPException(status_code=401, detail="Invalid API key")
     
     sid = request.sessionId
@@ -494,6 +507,11 @@ async def delete_session(
     
     raise HTTPException(status_code=404, detail="Session not found")
 
+
+@app.get("/ping")
+async def ping():
+    """Simple ping for connectivity check without auth/models."""
+    return {"status": "alive", "timestamp": datetime.now().isoformat()}
 
 @app.get("/")
 async def root():
