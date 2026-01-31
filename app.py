@@ -15,7 +15,7 @@ import re
 import uuid
 import os
 import httpx
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 from collections import defaultdict
 from datetime import datetime
 import logging
@@ -85,23 +85,30 @@ sessions: Dict[str, Dict] = defaultdict(lambda: {
 # ============================================================================
 
 class MessageModel(BaseModel):
+    model_config = ConfigDict(extra='ignore')
     sender: str = "scammer"
-    text: str
+    text: str = ""
     timestamp: Optional[str] = None
 
 class MetadataModel(BaseModel):
+    model_config = ConfigDict(extra='ignore')
     channel: Optional[str] = "SMS"
     language: Optional[str] = "English"
     locale: Optional[str] = "IN"
 
 class WebhookRequest(BaseModel):
-    """Incoming request from GUVI Platform"""
-    model_config = ConfigDict(populate_by_name=True)
+    """Incoming request from GUVI Platform - Hyper-Resilient Schema"""
+    model_config = ConfigDict(populate_by_name=True, extra='ignore')
     
-    sessionId: str = Field(validation_alias=AliasChoices("sessionId", "session_id"))
-    message: Union[MessageModel, str]
-    conversationHistory: Optional[List[MessageModel]] = Field(default_factory=list)
-    metadata: Optional[MetadataModel] = Field(default_factory=MetadataModel)
+    sessionId: str = Field(default="", validation_alias=AliasChoices("sessionId", "session_id"))
+    message: Any = None
+    conversationHistory: Optional[List[Any]] = Field(default_factory=list)
+    metadata: Optional[Any] = None
+
+    @field_validator("sessionId", mode="before")
+    @classmethod
+    def ensure_sid_string(cls, v):
+        return str(v) if v is not None else ""
 
     @field_validator("message", mode="before")
     @classmethod
@@ -349,13 +356,20 @@ async def handle_scam_webhook(
             logger.warning(f"Unauthorized access attempt. Got: {auth_header}")
             raise HTTPException(status_code=401, detail="Invalid API key")
     
-    sid = request.sessionId
-    # Handle cases where message might be the Union type
+    # Hyper-resilient message extraction
     msg_obj = request.message
+    latest_message = ""
+    
     if isinstance(msg_obj, str):
         latest_message = msg_obj
-    else:
-        latest_message = msg_obj.text
+    elif isinstance(msg_obj, dict):
+        # Check common field names for message text
+        latest_message = msg_obj.get("text") or msg_obj.get("content") or msg_obj.get("message") or ""
+    
+    if not latest_message:
+        logger.warning(f"Empty message received for session {sid}")
+        # Default to a safe greeting if message is missing to avoid logic break
+        latest_message = "Hello"
     
     session = sessions[sid]
     
