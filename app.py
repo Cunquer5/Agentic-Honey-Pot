@@ -357,6 +357,7 @@ async def handle_scam_webhook(
             raise HTTPException(status_code=401, detail="Invalid API key")
     
     # Hyper-resilient message extraction
+    sid = request.sessionId
     msg_obj = request.message
     latest_message = ""
     
