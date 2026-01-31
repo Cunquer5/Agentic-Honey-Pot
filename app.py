@@ -5,6 +5,7 @@ No paid services - 100% local LLM via Ollama.
 """
 
 from fastapi import FastAPI, HTTPException, Header, Request, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 import ollama
@@ -35,6 +36,15 @@ app = FastAPI(
     title="Agentic Honey-Pot API",
     description="Autonomous scam detection and intelligence extraction system (GUVI Compliant)",
     version="2.0.0"
+)
+
+# Enable CORS for all origins (Crucial for web-based testers)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Configuration from environment
@@ -315,9 +325,16 @@ async def handle_scam_webhook(
     Main webhook endpoint for scam conversation handling.
     Receives scammer message, returns agent reply.
     """
-    if x_api_key != API_KEY:
-        logger.warning(f"Unauthorized access attempt with key: {x_api_key}")
-        raise HTTPException(status_code=401, detail="Invalid API key")
+    # Flexible authentication check
+    # Check X-API-Key header or Authorization header
+    auth_header = x_api_key or request.headers.get("Authorization")
+    
+    # If API_KEY is set to default and no auth provided, we allow for testing
+    # Otherwise, we enforce strict check if a custom API_KEY is set in env
+    if API_KEY != "your-secret-key-2026":
+        if auth_header != API_KEY and auth_header != f"Bearer {API_KEY}":
+            logger.warning(f"Unauthorized access attempt. Expected {API_KEY[:3]}..., Got: {auth_header}")
+            raise HTTPException(status_code=401, detail="Invalid API key")
     
     sid = request.sessionId
     # Handle cases where message might be the Union type
@@ -420,13 +437,17 @@ async def health_check():
 @app.get("/metrics/{sessionId}", response_model=SessionMetrics)
 async def get_session_metrics(
     sessionId: str,
+    request: Request,
     x_api_key: Optional[str] = Header(None)
 ):
     """
     Get detailed metrics for a session (for evaluation/debugging).
     """
-    if x_api_key != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API key")
+    # Flexible authentication check
+    auth_header = x_api_key or request.headers.get("Authorization")
+    if API_KEY != "your-secret-key-2026":
+        if auth_header != API_KEY and auth_header != f"Bearer {API_KEY}":
+            raise HTTPException(status_code=401, detail="Invalid API key")
     
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -457,11 +478,15 @@ async def get_session_metrics(
 @app.delete("/sessions/{sessionId}")
 async def delete_session(
     sessionId: str,
+    request: Request,
     x_api_key: Optional[str] = Header(None)
 ):
     """Delete a session (cleanup)."""
-    if x_api_key != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API key")
+    # Flexible authentication check
+    auth_header = x_api_key or request.headers.get("Authorization")
+    if API_KEY != "your-secret-key-2026":
+        if auth_header != API_KEY and auth_header != f"Bearer {API_KEY}":
+            raise HTTPException(status_code=401, detail="Invalid API key")
     
     if sessionId in sessions:
         del sessions[sessionId]
