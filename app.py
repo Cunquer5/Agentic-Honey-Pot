@@ -7,7 +7,7 @@ No paid services - 100% local LLM via Ollama.
 from fastapi import FastAPI, HTTPException, Header, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, ConfigDict, AliasChoices
 import ollama
 from ollama import AsyncClient
 import asyncio
@@ -98,7 +98,7 @@ class WebhookRequest(BaseModel):
     """Incoming request from GUVI Platform"""
     model_config = ConfigDict(populate_by_name=True)
     
-    sessionId: str = Field(alias="session_id")
+    sessionId: str = Field(validation_alias=AliasChoices("sessionId", "session_id"))
     message: Union[MessageModel, str]
     conversationHistory: Optional[List[MessageModel]] = Field(default_factory=list)
     metadata: Optional[MetadataModel] = Field(default_factory=MetadataModel)
