@@ -6,7 +6,9 @@ No paid services - 100% local LLM via Ollama.
 
 from fastapi import FastAPI, HTTPException, Header, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator, ConfigDict, AliasChoices
 import ollama
 from ollama import AsyncClient
@@ -56,12 +58,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # Configuration from environment
 API_KEY = os.getenv("API_KEY", "your-secret-key-2026")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:1b-instruct-q4_K_M")
 MAX_TURNS = int(os.getenv("MAX_TURNS", "15"))
 MAX_HISTORY_TURNS = int(os.getenv("MAX_HISTORY_TURNS", "12"))
 GUVI_CALLBACK_URL = "https://hackathon.guvi.in/api/updateHoneyPotFinalResult"
+
+# Initialize templates after configuration
+templates = Jinja2Templates(directory="templates")
 
 # In-memory session store
 sessions: Dict[str, Dict] = defaultdict(lambda: {
@@ -528,9 +536,9 @@ async def ping():
     """Simple ping for connectivity check without auth/models."""
     return {"status": "alive", "timestamp": datetime.now().isoformat()}
 
-@app.get("/")
-async def root():
-    """Root endpoint with API info."""
+@app.get("/api")
+async def api_info():
+    """API info endpoint."""
     return {
         "name": "Agentic Honey-Pot API",
         "version": "2.0.0",
@@ -542,6 +550,32 @@ async def root():
         },
         "docs": "/docs"
     }
+
+@app.get("/")
+async def root(request: Request):
+    """Serve the web UI"""
+    return HTMLResponse("""
+    <!DOCTYPE html>
+    <html>
+    <head><title>Test</title></head>
+    <body>
+        <h1>Scammer Roleplay Interface</h1>
+        <p>If you see this, the server is working!</p>
+        <a href="/web-ui">Go to Web UI</a>
+    </body>
+    </html>
+    """)
+
+@app.get("/web-ui")
+async def web_ui(request: Request):
+    """Serve the web UI"""
+    # Read the HTML file directly and return as HTMLResponse
+    try:
+        with open("templates/simple.html", "r", encoding="utf-8") as f:
+            content = f.read()
+        return HTMLResponse(content)
+    except FileNotFoundError:
+        return HTMLResponse("<h1>Template not found</h1>", status_code=404)
 
 
 # ============================================================================

@@ -1,29 +1,265 @@
-# Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
+# C extensions
 *.so
+
+# Distribution / packaging
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
 env/
 venv/
 ENV/
-build/
-dist/
-*.egg-info/
+env.bak/
+venv.bak/
 
-# Environment
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Environment and Configuration
 .env
+.env.local
+.env.development
+.env.test
+.env.production
+config.local.py
+secrets.json
 
-# IDE
+# IDE and Editor Files
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.DS_Store
+Thumbs.db
+*.sublime-*
+.atom/
+.brackets/
 
 # Logs
 *.log
 logs/
+*.out
+*.err
+debug.log
+access.log
+error.log
 
-# OS
+# Database
+*.db
+*.sqlite
+*.sqlite3
+database/
+db/
+
+# Cache and Temporary Files
+.cache/
+*.tmp
+*.temp
+.tmp/
+temp/
+.cache/
+.pytest_cache/
+
+# OS Generated Files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+
+# Node.js (if using for frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+
+# Frontend Build Files
+build/
+dist/
+*.min.js
+*.min.css
+
+# Ollama Models (large files)
+ollama_models/
+*.bin
+*.gguf
+
+# Session Data (sensitive)
+sessions/
+session_data/
+*.session
+
+# API Keys and Secrets
+api_keys.txt
+secrets.txt
+credentials.json
+*.pem
+*.key
+*.crt
+
+# Backup Files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Local Development
+local/
+dev/
+test_data/
+mock_data/
+
+# Documentation Build
+docs/_build/
+docs/build/
+
+# Coverage Reports
+coverage/
+.coverage
+htmlcov/
+.nyc_output/
+
+# Performance Monitoring
+*.prof
+*.profile
+
+# AI/ML Model Files
+models/
+*.model
+*.pkl
+*.joblib
+
+# Docker
+.dockerignore.local
+docker-compose.override.yml
+
+# Kubernetes
+*.kubeconfig
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Monitoring and Metrics
+prometheus_data/
+grafana_data/
+metrics/
+
+# Custom Application Files
+uploads/
+static/uploads/
+media/
+user_data/

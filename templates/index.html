@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scammer Roleplay Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <style>
+        .chat-message {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .typing-indicator::after {
+            content: '...';
+            animation: typing 1.5s infinite;
+        }
+        @keyframes typing {
+            0%, 60%, 100% { opacity: 1; }
+            30% { opacity: 0.3; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 h-screen overflow-hidden" x-data="scamChat()">
+    <!-- Header -->
+    <header class="bg-gray-800 border-b border-gray-700 px-6 py-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <h1 class="text-xl font-bold text-white">Scammer Roleplay Interface</h1>
+                <span class="text-sm text-gray-400">Session: <span x-text="sessionId"></span></span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-400">Status: <span class="text-green-400" x-text="status"></span></span>
+                <button @click="resetSession()" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-medium transition-colors">
+                    Reset Session
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="flex h-[calc(100vh-80px)]">
+        <!-- Chat Area -->
+        <main class="flex-1 flex flex-col bg-gray-900">
+            <!-- Chat Messages -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-4" id="chatContainer">
+                <template x-for="message in messages" :key="message.id">
+                    <div class="chat-message flex"
+                         :class="message.role === 'scammer' ? 'justify-end' : 'justify-start'">
+                        <div class="max-w-xs lg:max-w-md">
+                            <div class="px-4 py-2 rounded-lg"
+                                 :class="message.role === 'scammer' 
+                                    ? 'bg-blue-600 text-white rounded-br-none' 
+                                    : 'bg-gray-700 text-gray-100 rounded-bl-none'">
+                                <p class="text-sm" x-text="message.content"></p>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1 px-2" x-text="message.timestamp"></p>
+                        </div>
+                    </div>
+                </template>
+                
+                <!-- Typing Indicator -->
+                <div x-show="isTyping" class="flex justify-start">
+                    <div class="bg-gray-700 px-4 py-2 rounded-lg rounded-bl-none">
+                        <span class="typing-indicator text-gray-400"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Message Input -->
+            <div class="border-t border-gray-700 p-4">
+                <form @submit.prevent="sendMessage()" class="flex space-x-4">
+                    <input 
+                        type="text" 
+                        x-model="inputMessage"
+                        :disabled="isTyping"
+                        placeholder="Type your scammer message here..."
+                        class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                    >
+                    <button 
+                        type="submit"
+                        :disabled="isTyping || !inputMessage.trim()"
+                        class="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
+                    >
+                        Send
+                    </button>
+                </form>
+            </div>
+        </main>
+
+        <!-- Intelligence Panel -->
+        <aside class="w-80 bg-gray-800 border-l border-gray-700 overflow-y-auto">
+            <div class="p-6">
+                <h2 class="text-lg font-bold text-white mb-4 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 100 4h2a2 2 0 100-4h-.5a1 1 0 000-2H8a2 2 0 012-2h2a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2V5z" clip-rule="evenodd"/>
+                    </svg>
+                    Extracted Intelligence
+                </h2>
+
+                <!-- Session Stats -->
+                <div class="bg-gray-700 rounded-lg p-4 mb-6">
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <p class="text-gray-400">Turns</p>
+                            <p class="text-xl font-bold text-blue-400" x-text="sessionStats.turnCount"></p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400">Scam Detected</p>
+                            <p class="text-xl font-bold" :class="sessionStats.scamDetected ? 'text-red-400' : 'text-green-400'" x-text="sessionStats.scamDetected ? 'YES' : 'NO'"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bank Accounts -->
+                <div class="mb-6">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-2 flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
+                            <path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/>
+                        </svg>
+                        Bank Accounts
+                    </h3>
+                    <div class="space-y-1">
+                        <template x-for="account in extractedData.bankAccounts" :key="account">
+                            <div class="bg-gray-700 px-3 py-2 rounded text-sm font-mono text-red-400" x-text="account"></div>
+                        </template>
+                        <div x-show="extractedData.bankAccounts.length === 0" class="text-gray-500 text-sm italic">None detected</div>
+                    </div>
+                </div>
+
+                <!-- UPI IDs -->
+                <div class="mb-6">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-2 flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                        </svg>
+                        UPI IDs
+                    </h3>
+                    <div class="space-y-1">
+                        <template x-for="upi in extractedData.upiIds" :key="upi">
+                            <div class="bg-gray-700 px-3 py-2 rounded text-sm font-mono text-orange-400" x-text="upi"></div>
+                        </template>
+                        <div x-show="extractedData.upiIds.length === 0" class="text-gray-500 text-sm italic">None detected</div>
+                    </div>
+                </div>
+
+                <!-- Phone Numbers -->
+                <div class="mb-6">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-2 flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
+                        </svg>
+                        Phone Numbers
+                    </h3>
+                    <div class="space-y-1">
+                        <template x-for="phone in extractedData.phoneNumbers" :key="phone">
+                            <div class="bg-gray-700 px-3 py-2 rounded text-sm font-mono text-green-400" x-text="phone"></div>
+                        </template>
+                        <div x-show="extractedData.phoneNumbers.length === 0" class="text-gray-500 text-sm italic">None detected</div>
+                    </div>
+                </div>
+
+                <!-- Phishing Links -->
+                <div class="mb-6">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-2 flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clip-rule="evenodd"/>
+                        </svg>
+                        Phishing Links
+                    </h3>
+                    <div class="space-y-1">
+                        <template x-for="link in extractedData.phishingLinks" :key="link">
+                            <div class="bg-gray-700 px-3 py-2 rounded text-sm text-purple-400 break-all" x-text="link"></div>
+                        </template>
+                        <div x-show="extractedData.phishingLinks.length === 0" class="text-gray-500 text-sm italic">None detected</div>
+                    </div>
+                </div>
+
+                <!-- Suspicious Keywords -->
+                <div class="mb-6">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-2 flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        Suspicious Keywords
+                    </h3>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="keyword in extractedData.suspiciousKeywords" :key="keyword">
+                            <span class="bg-gray-700 px-2 py-1 rounded text-xs text-yellow-400" x-text="keyword"></span>
+                        </template>
+                        <div x-show="extractedData.suspiciousKeywords.length === 0" class="text-gray-500 text-sm italic">None detected</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        function scamChat() {
+            return {
+                messages: [],
+                inputMessage: '',
+                isTyping: false,
+                sessionId: '',
+                status: 'Ready',
+                extractedData: {
+                    bankAccounts: [],
+                    upiIds: [],
+                    phoneNumbers: [],
+                    phishingLinks: [],
+                    suspiciousKeywords: []
+                },
+                sessionStats: {
+                    turnCount: 0,
+                    scamDetected: false
+                },
+
+                init() {
+                    this.resetSession();
+                    this.$nextTick(() => {
+                        this.scrollToBottom();
+                    });
+                },
+
+                async resetSession() {
+                    this.sessionId = 'session_' + Date.now();
+                    this.messages = [{
+                        id: 1,
+                        role: 'agent',
+                        content: 'Hello! I am Ramesh Patel, a retired man from Mumbai. How can I help you today?',
+                        timestamp: new Date().toLocaleTimeString()
+                    }];
+                    this.extractedData = {
+                        bankAccounts: [],
+                        upiIds: [],
+                        phoneNumbers: [],
+                        phishingLinks: [],
+                        suspiciousKeywords: []
+                    };
+                    this.sessionStats = {
+                        turnCount: 0,
+                        scamDetected: false
+                    };
+                    this.status = 'Ready';
+                    this.inputMessage = '';
+                    this.$nextTick(() => this.scrollToBottom());
+                },
+
+                async sendMessage() {
+                    if (!this.inputMessage.trim() || this.isTyping) return;
+
+                    const userMessage = this.inputMessage.trim();
+                    this.inputMessage = '';
+                    this.isTyping = true;
+                    this.status = 'Processing...';
+
+                    // Add user message
+                    this.messages.push({
+                        id: Date.now(),
+                        role: 'scammer',
+                        content: userMessage,
+                        timestamp: new Date().toLocaleTimeString()
+                    });
+
+                    this.$nextTick(() => this.scrollToBottom());
+
+                    try {
+                        const response = await fetch('/webhook', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-API-Key': 'your-secret-key-2026'
+                            },
+                            body: JSON.stringify({
+                                sessionId: this.sessionId,
+                                message: userMessage
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (data.reply) {
+                            this.messages.push({
+                                id: Date.now() + 1,
+                                role: 'agent',
+                                content: data.reply,
+                                timestamp: new Date().toLocaleTimeString()
+                            });
+                        }
+
+                        // Update extracted data
+                        await this.updateSessionData();
+                        
+                    } catch (error) {
+                        console.error('Error:', error);
+                        this.messages.push({
+                            id: Date.now() + 1,
+                            role: 'agent',
+                            content: 'Sorry, I encountered an error. Please try again.',
+                            timestamp: new Date().toLocaleTimeString()
+                        });
+                    } finally {
+                        this.isTyping = false;
+                        this.status = 'Ready';
+                        this.$nextTick(() => this.scrollToBottom());
+                    }
+                },
+
+                async updateSessionData() {
+                    try {
+                        const response = await fetch(`/metrics/${this.sessionId}`, {
+                            headers: {
+                                'X-API-Key': 'your-secret-key-2026'
+                            }
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.extractedData = data.extracted_info;
+                            this.sessionStats = {
+                                turnCount: data.turn_count,
+                                scamDetected: data.detected_scam
+                            };
+                        }
+                    } catch (error) {
+                        console.error('Error fetching session data:', error);
+                    }
+                },
+
+                scrollToBottom() {
+                    const container = document.getElementById('chatContainer');
+                    if (container) {
+                        container.scrollTop = container.scrollHeight;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

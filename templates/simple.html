@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scammer Roleplay Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-900 text-gray-100 h-screen overflow-hidden" x-data="scamChat()">
+    <div class="container mx-auto p-4">
+        <h1 class="text-2xl font-bold mb-4">Scammer Roleplay Interface</h1>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Chat Area -->
+            <div class="lg:col-span-2 bg-gray-800 rounded-lg p-4">
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm text-gray-400">Session: <span x-text="sessionId"></span></span>
+                        <span class="text-sm text-gray-400">Status: <span x-text="status"></span></span>
+                    </div>
+                </div>
+                
+                <div id="chatContainer" class="h-96 overflow-y-auto mb-4 p-4 bg-gray-700 rounded">
+                    <template x-for="message in messages" :key="message.id">
+                        <div class="mb-2" :class="message.role === 'scammer' ? 'text-right' : 'text-left'">
+                            <div class="inline-block px-3 py-2 rounded max-w-xs"
+                                 :class="message.role === 'scammer' ? 'bg-blue-600 text-white' : 'bg-gray-600 text-gray-100'">
+                                <p x-text="message.content"></p>
+                                <p class="text-xs opacity-75 mt-1" x-text="message.timestamp"></p>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="isTyping" class="text-left">
+                        <div class="inline-block px-3 py-2 rounded bg-gray-600 text-gray-100">
+                            <span class="typing-indicator">...</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex">
+                    <input 
+                        type="text" 
+                        x-model="inputMessage"
+                        :disabled="isTyping"
+                        placeholder="Type your scammer message here..."
+                        class="flex-1 bg-gray-700 border border-gray-600 rounded-l px-4 py-2 text-gray-100"
+                    >
+                    <button 
+                        @click="sendMessage()"
+                        :disabled="isTyping || !inputMessage.trim()"
+                        class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded-r"
+                    >
+                        Send
+                    </button>
+                </div>
+                
+                <button @click="resetSession()" class="mt-2 bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-sm">
+                    Reset Session
+                </button>
+            </div>
+            
+            <!-- Intelligence Panel -->
+            <div class="bg-gray-800 rounded-lg p-4">
+                <h2 class="text-lg font-bold mb-4">Extracted Intelligence</h2>
+                
+                <div class="mb-4 bg-gray-700 p-3 rounded">
+                    <div class="text-sm">
+                        <div>Turns: <span class="font-bold text-blue-400" x-text="sessionStats.turnCount"></span></div>
+                        <div>Scam: <span class="font-bold" :class="sessionStats.scamDetected ? 'text-red-400' : 'text-green-400'" x-text="sessionStats.scamDetected ? 'YES' : 'NO'"></span></div>
+                    </div>
+                </div>
+                
+                <div class="space-y-3">
+                    <div>
+                        <h3 class="text-sm font-semibold mb-1">Bank Accounts</h3>
+                        <template x-for="account in extractedData.bankAccounts" :key="account">
+                            <div class="bg-gray-700 px-2 py-1 rounded text-xs text-red-400 mb-1" x-text="account"></div>
+                        </template>
+                        <div x-show="extractedData.bankAccounts.length === 0" class="text-gray-500 text-xs italic">None detected</div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-sm font-semibold mb-1">UPI IDs</h3>
+                        <template x-for="upi in extractedData.upiIds" :key="upi">
+                            <div class="bg-gray-700 px-2 py-1 rounded text-xs text-orange-400 mb-1" x-text="upi"></div>
+                        </template>
+                        <div x-show="extractedData.upiIds.length === 0" class="text-gray-500 text-xs italic">None detected</div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-sm font-semibold mb-1">Phone Numbers</h3>
+                        <template x-for="phone in extractedData.phoneNumbers" :key="phone">
+                            <div class="bg-gray-700 px-2 py-1 rounded text-xs text-green-400 mb-1" x-text="phone"></div>
+                        </template>
+                        <div x-show="extractedData.phoneNumbers.length === 0" class="text-gray-500 text-xs italic">None detected</div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-sm font-semibold mb-1">Phishing Links</h3>
+                        <template x-for="link in extractedData.phishingLinks" :key="link">
+                            <div class="bg-gray-700 px-2 py-1 rounded text-xs text-purple-400 mb-1 break-all" x-text="link"></div>
+                        </template>
+                        <div x-show="extractedData.phishingLinks.length === 0" class="text-gray-500 text-xs italic">None detected</div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-sm font-semibold mb-1">Keywords</h3>
+                        <div class="flex flex-wrap gap-1">
+                            <template x-for="keyword in extractedData.suspiciousKeywords" :key="keyword">
+                                <span class="bg-gray-700 px-2 py-1 rounded text-xs text-yellow-400" x-text="keyword"></span>
+                            </template>
+                        </div>
+                        <div x-show="extractedData.suspiciousKeywords.length === 0" class="text-gray-500 text-xs italic">None detected</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function scamChat() {
+            return {
+                messages: [],
+                inputMessage: '',
+                isTyping: false,
+                sessionId: '',
+                status: 'Ready',
+                extractedData: {
+                    bankAccounts: [],
+                    upiIds: [],
+                    phoneNumbers: [],
+                    phishingLinks: [],
+                    suspiciousKeywords: []
+                },
+                sessionStats: {
+                    turnCount: 0,
+                    scamDetected: false
+                },
+
+                init() {
+                    this.resetSession();
+                },
+
+                async resetSession() {
+                    this.sessionId = 'session_' + Date.now();
+                    this.messages = [{
+                        id: 1,
+                        role: 'agent',
+                        content: 'Hello! I am Ramesh Patel, a retired man from Mumbai. How can I help you today?',
+                        timestamp: new Date().toLocaleTimeString()
+                    }];
+                    this.extractedData = {
+                        bankAccounts: [],
+                        upiIds: [],
+                        phoneNumbers: [],
+                        phishingLinks: [],
+                        suspiciousKeywords: []
+                    };
+                    this.sessionStats = {
+                        turnCount: 0,
+                        scamDetected: false
+                    };
+                    this.status = 'Ready';
+                    this.inputMessage = '';
+                },
+
+                async sendMessage() {
+                    if (!this.inputMessage.trim() || this.isTyping) return;
+
+                    const userMessage = this.inputMessage.trim();
+                    this.inputMessage = '';
+                    this.isTyping = true;
+                    this.status = 'Processing...';
+
+                    this.messages.push({
+                        id: Date.now(),
+                        role: 'scammer',
+                        content: userMessage,
+                        timestamp: new Date().toLocaleTimeString()
+                    });
+
+                    try {
+                        const response = await fetch('/webhook', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-API-Key': 'your-secret-key-2026'
+                            },
+                            body: JSON.stringify({
+                                sessionId: this.sessionId,
+                                message: userMessage
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (data.reply) {
+                            this.messages.push({
+                                id: Date.now() + 1,
+                                role: 'agent',
+                                content: data.reply,
+                                timestamp: new Date().toLocaleTimeString()
+                            });
+                        }
+
+                        await this.updateSessionData();
+                        
+                    } catch (error) {
+                        console.error('Error:', error);
+                        this.messages.push({
+                            id: Date.now() + 1,
+                            role: 'agent',
+                            content: 'Sorry, I encountered an error. Please try again.',
+                            timestamp: new Date().toLocaleTimeString()
+                        });
+                    } finally {
+                        this.isTyping = false;
+                        this.status = 'Ready';
+                    }
+                },
+
+                async updateSessionData() {
+                    try {
+                        const response = await fetch(`/metrics/${this.sessionId}`, {
+                            headers: {
+                                'X-API-Key': 'your-secret-key-2026'
+                            }
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.extractedData = data.extracted_info;
+                            this.sessionStats = {
+                                turnCount: data.turn_count,
+                                scamDetected: data.detected_scam
+                            };
+                        }
+                    } catch (error) {
+                        console.error('Error fetching session data:', error);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
